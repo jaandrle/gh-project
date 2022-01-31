@@ -107,9 +107,9 @@ if [[ "--help" = "$cmd" ]]; then
     Manipulate given card
 
     USAGE
-      gh project num_project num_column num_card [up|down|column|view] [num_card_target|num_column_target] --[FLAGS]
+      gh project num_project num_column num_card [above|below|column|view] [num_card_target|num_column_target] --[FLAGS]
 
-      - up/down [num_card_target]: change position inside current column
+      - above/below [num_card_target]: change position inside current column
         …place before/after target card ('num_card_target') – defaults to 'top'/'bottom'
       - column [num_column_target]: move to target column ('num_column_target'),
         …if no 'num_column_target' given you can input interactively
@@ -123,16 +123,16 @@ if [[ "--help" = "$cmd" ]]; then
 fi
 shift
 id_card=`echo "$list_cards" | jq ". | map(select(.number == $num_card)) | .[0].id"`
-if [[ "$cmd" = "up" ]] || [[ "$cmd" = "down" ]]; then
+if [[ "$cmd" = "above" ]] || [[ "$cmd" = "below" ]]; then
     if [[ "${1:-}" != "" ]]; then
         testNumber "position inside column" $1
-        [[ "$cmd" = "up" ]] \
+        [[ "$cmd" = "above" ]] \
             && id_target=`echo "$list_cards" | jq ". | map(select(.number == $1 - 1)) | .[0].id"` \
             || id_target=`echo "$list_cards" | jq ". | map(select(.number == $1)) | .[0].id"`
         exec gh api "/projects/columns/cards/$id_card/moves" -f "position=after:$id_target" > /dev/null \
             && echo "Moved successfully"
     fi
-    [[ "$cmd" = "up" ]] \
+    [[ "$cmd" = "above" ]] \
         && position="top" \
         || position="bottom"
     exec gh api "/projects/columns/cards/$id_card/moves" -f "position=$position" > /dev/null \
