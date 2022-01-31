@@ -76,9 +76,9 @@ gh project 19 0
 # 4       null    ??? (historické)        Nataliya Kuhle: `var_dump(html_entity_decode("Internal ToDo’s &# 58;"));`
 # 5       null    ###### Automation Rules         - `demilestoned_issue`  - `new_issue`
 
-gh project 19 0 0 down
+gh project 19 0 0 below
 # now 5
-gh project 19 0 5 up 1
+gh project 19 0 5 above 1
 # now 1 (1 → 2, 2 → 3, …)
 gh project 19 0 1 column 1
 # under 'In progress' column as first
