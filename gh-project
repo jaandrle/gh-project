@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+set -e
+(! type -p bash >/dev/null) && echo "Bash not found on the system" >&2 && exit 1
+(! type -p jq >/dev/null) && echo "JQ not found on the system" >&2 && exit 1
+help_flags="\
+    FLAGS
+      help\tshow help for “current level” (projects, columns, cards list, …)
+"
+num_project=${1:-list}
+if [[ "--help" = "$num_project" ]]; then
+    echo -e "
+    Work with GitHub Projects
+
+    USAGE
+      gh project [num_project [num_column [num_card]]] --[FLAGS]
+
+    EXAMPLES
+      gh project\tprints projects list in current repo
+      gh project 1\tprints columns for project with id 1
+      gh project 1 2\tprints cards in column 1 (in project 1)
+"
+    echo -e "$help_flags"
+    exit 0
+fi
+list_projects=`gh api "/repos/{owner}/{repo}/projects" -q "[ .[] | { id, number, name, body } ]"`
+if [[ "list" = "$num_project" ]]; then
+    echo -e "NUM\tNAME\tDESCRIPTION"
+    echo "$list_projects" | jq -r '.[] | [ .number, .name, .body ] | join("\t")'
+    exit 0
+fi
+
+testNumber(){
+    [ $2 -eq $2 ] &>/dev/null && return 0
+    echo "For choosing $1 use number, not '$2'"
+    echo "For help use '--help'"
+    exit 1
+}
+
+testNumber "project" $num_project
+shift
+num_column=${1:-list}
+if [[ "--help" = "$num_column" ]]; then
+    echo -e "
+    Show columns for given project
+
+    USAGE
+      gh project num_project [num_column [num_card]] --[FLAGS]
+
+    EXAMPLES
+      gh project 1\tprints columns for project with id 1
+      gh project 1 2\tprints cards in column 1 (in project 1)
+"
+    echo -e "$help_flags"
+    exit 0
+fi
+__project=`echo "$list_projects" | jq ". | map(select(.number == $num_project)) | .[0]"`
+id_project=`echo "$__project" | jq -r '.id'`
+name_project="Project '`echo "$__project" | jq -r '.name'`'"
+list_columns=`gh api "projects/$id_project/columns" -q '. as $arr | reduce range(0;length) as $i ([]; . + [ $arr[$i] | { id, name, "number": $i } ])'`
+if [[ "list" = "$num_column" ]]; then
+    echo -e "$name_project\n\nNUM\tNAME"
+    echo "$list_columns" | jq -r '.[] | [ .number, .name ] | join("\t")'
+    exit 0
+fi
+
+testNumber "column" $num_column
+shift
+num_card=${1:-list}
+if [[ "--help" = "$num_card" ]]; then
+    echo -e "
+    Show cards for given column
+
+    USAGE
+      gh project num_project num_column [num_card] --[FLAGS]
+
+    EXAMPLES
+      gh project 1 2\tprints cards in column 1 (in project 1)
+"
+    echo -e "$help_flags"
+    exit 0
+fi
+__column=`echo "$list_columns" | jq ". | map(select(.number == $num_column)) | .[0]"`
+id_column=`echo "$__column" | jq -r '.id'`
+name_column="$name_project → Column '`echo "$__column" | jq -r '.name'`'"
+list_cards=`gh api "projects/columns/$id_column/cards" -q '. as $arr | reduce range(0;length) as $i ([]; . + [ $arr[$i] | { id, note, "number": $i, "issue": (try .content_url | split("/") | .[-1] catch null) } ])'`
+if [[ "list" = "$num_card" ]]; then
+    echo -e "$name_column\nNUM\tISSUE\tTITLE/NOTE"
+    length=`echo "$list_cards" | jq -r ". | length"`
+    declare -i i=0
+    while [[ $i < $length ]]; do
+        number=`echo "$list_cards" | jq -r ".[$i].number"`
+        issue=`echo "$list_cards" | jq -r ".[$i].issue"`
+        [[ "$issue" = "null" ]] \
+            && note=`echo "$list_cards" | jq -r ".[$i].note"' | split("\r\n") |  join("\t")'` \
+            || note=`gh issue view $issue --json title -q '.title'`
+        echo -e "$number\t$issue\t$note"
+        i=$(( i + 1 ))
+    done
+    exit 0
+fi
+
+testNumber "card" $num_card
+shift
+cmd=${1:---help}
+if [[ "--help" = "$cmd" ]]; then
+    echo -e "
+    Manipulate given card
+
+    USAGE
+      gh project num_project num_column num_card [up|down|column|view] [num_card_target|num_column_target] --[FLAGS]
+
+      - up/down [num_card_target]: change position inside current column
+        …place before/after target card ('num_card_target') – defaults to 'top'/'bottom'
+      - column [num_column_target]: move to target column ('num_column_target'),
+        …if no 'num_column_target' given you can input interactively
+      - view: alias for 'gh issue view :id: -c', or shows note
+
+    EXAMPLES
+      gh project 1 2\tprints cards in column 1 (in project 1)
+"
+    echo -e "$help_flags"
+    exit 0
+fi
+shift
+id_card=`echo "$list_cards" | jq ". | map(select(.number == $num_card)) | .[0].id"`
+if [[ "$cmd" = "up" ]] || [[ "$cmd" = "down" ]]; then
+    if [[ "${1:-}" != "" ]]; then
+        testNumber "position inside column" $1
+        [[ "$cmd" = "up" ]] \
+            && id_target=`echo "$list_cards" | jq ". | map(select(.number == $1 - 1)) | .[0].id"` \
+            || id_target=`echo "$list_cards" | jq ". | map(select(.number == $1)) | .[0].id"`
+        exec gh api "/projects/columns/cards/$id_card/moves" -f "position=after:$id_target" > /dev/null \
+            && echo "Moved successfully"
+    fi
+    [[ "$cmd" = "up" ]] \
+        && position="top" \
+        || position="bottom"
+    exec gh api "/projects/columns/cards/$id_card/moves" -f "position=$position" > /dev/null \
+        && echo "Moved successfully"
+fi
+
+if [[ $cmd == "view" ]]; then
+    issue=`echo "$list_cards" | jq -r ". | map(select(.number == $num_card)) | .[0].issue"`
+    if [[ "$issue" != "null" ]]; then
+        exec gh issue view $issue -c
+        exit 0
+    fi
+    echo -e "`echo "$list_cards" | jq -r ". | map(select(.number == $num_card)) | .[0].note"`"
+    exit 0
+fi
+
+if [[ "$cmd" != "column" ]]; then
+    echo "Wrong argument '$cmd'"
+    echo "Use '--help' for help"
+    exit 1
+fi
+
+if [[ "${1:-}" == "" ]]; then
+    echo "$name_column"
+    echo -e "Columns:\n\t`echo "$list_columns" | jq -r '[ .[] | [ .number, .name ] | join(": ") ] | join("\n\t")'`"
+    echo ""
+    read -p "Enter target column number: " num_column_target
+else
+    num_column_target=$1
+    shift
+fi
+testNumber "target column" $num_column_target
+id_column_target=`echo "$list_columns" | jq ". | map(select(.number == $num_column_target)) | .[0].id"`
+exec gh api "/projects/columns/cards/$id_card/moves" -f "position=top" -F "column_id=$id_column_target"
