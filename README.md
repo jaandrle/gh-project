@@ -36,9 +36,9 @@ gh extension install jaandrle/gh-project
       Manipulate given card
 
       USAGE
-        gh project num_project num_column num_card [up|down|column|view] [num_card_target|num_column_target] --[FLAGS]
+        gh project num_project num_column num_card [above|below|column|view] [num_card_target|num_column_target] --[FLAGS]
 
-        - up/down [num_card_target]: change position inside current column
+        - above/below [num_card_target]: change position inside current column
           …place before/after target card ('num_card_target') – defaults to 'top'/'bottom'
         - column [num_column_target]: move to target column ('num_column_target'),
           …if no 'num_column_target' given you can input interactively
