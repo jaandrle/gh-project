@@ -5,6 +5,7 @@ set -e
 help_flags="\
     FLAGS
       help\tshow help for “current level” (projects, columns, cards list, …)
+      web\topens project in web browser
 "
 num_project=${1:-list}
 if [[ "--help" = "$num_project" ]]; then
@@ -22,7 +23,7 @@ if [[ "--help" = "$num_project" ]]; then
     echo -e "$help_flags"
     exit 0
 fi
-list_projects=`gh api "/repos/{owner}/{repo}/projects" -q "[ .[] | { id, number, name, body } ]"`
+list_projects=`gh api "/repos/{owner}/{repo}/projects" -q "[ .[] | { id, number, name, body, html_url } ]"`
 if [[ "list" = "$num_project" ]]; then
     echo -e "NUM\tNAME\tDESCRIPTION"
     echo "$list_projects" | jq -r '.[] | [ .number, .name, .body ] | join("\t")'
@@ -38,6 +39,11 @@ testNumber(){
 
 testNumber "project" $num_project
 shift
+if [[ "$*" =~ "--web" ]]; then
+    exo-open --launch WebBrowser "`echo "$list_projects" | jq -r ". | map(select(.number == $num_project)) | .[0].html_url"`?fullscreen=true"
+    exit 0
+fi
+
 num_column=${1:-list}
 if [[ "--help" = "$num_column" ]]; then
     echo -e "
