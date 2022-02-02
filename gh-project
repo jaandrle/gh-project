@@ -99,6 +99,6 @@ testNumber "target column" $num_column_target
 __column=`echo "$list_columns" | jq ". | map(select(.number == $num_column_target)) | .[0]"`
 id_column_target=`jqChoose "$__column" '.id'`
 name_column_target="$name_project → Column '`jqChoose "$__column" '.name'`'"
-gh api "/projects/columns/cards/$id_card/moves" -f "position=top" -F "column_id=$id_column_target" > /dev/null \
+gh api "/projects/columns/cards/$id_card/moves" -f "position=bottom" -F "column_id=$id_column_target" > /dev/null \
     && printColumn "$name_column_target" "`listCards $id_column_target`"
 exit "$?"
