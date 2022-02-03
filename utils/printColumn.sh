@@ -1,5 +1,6 @@
 printColumn(){
-    echo -e "$1\nNUM\tISSUE\tTITLE/NOTE"
+    [[ -t 1 ]]\
+        && echo -e "$1\nNUM\tISSUE\tTITLE/NOTE"
     length=`echo "$2" | jq -r ". | length"`
     declare -i i=0
     while [[ $i < $length ]]; do

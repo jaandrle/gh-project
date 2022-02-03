@@ -8,9 +8,14 @@ num_project=${1:-list}
 [[ "--help" = "$num_project" ]] && source $this_dir'help/main.sh'
 jqChoose(){ echo "$1" | jq -r "$2"; }
 
+[[ -t 1 ]]\
+    && is_pipe=0\
+    || is_pipe=1
+
 list_projects=`gh api "/repos/{owner}/{repo}/projects" -q "[ .[] | { id, number, name, body, html_url } ]"`
 if [[ "list" = "$num_project" ]]; then
-    echo -e "NUM\tNAME\t\tDESCRIPTION"
+    [ $is_pipe == 0 ]\
+        && echo -e "NUM\tNAME\t\tDESCRIPTION"
     jqChoose "$list_projects" '.[] | [ .number, ( .name + "\t" ), .body ] | join("\t")'
     exit 0
 fi
@@ -32,7 +37,8 @@ id_project=`jqChoose "$__project" '.id'`
 name_project="Project '`jqChoose "$__project" '.name'`'"
 list_columns=`gh api "projects/$id_project/columns" -q '. as $arr | reduce range(0;length) as $i ([]; . + [ $arr[$i] | { id, name, "number": $i } ])'`
 if [[ "list" = "$num_column" ]]; then
-    echo -e "$name_project\n\nNUM\tNAME"
+    [ $is_pipe == 0 ]\
+        && echo -e "$name_project\n\nNUM\tNAME"
     jqChoose "$list_columns" '.[] | [ .number, .name ] | join("\t")'
     exit 0
 fi
